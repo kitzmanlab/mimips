@@ -313,8 +313,14 @@ rule gather_qc:
         tblOut['num_pairs_input'] = tblJoint['num_reads_ok']+tblJoint['num_reads_filter_acapture']+tblJoint['num_reads_filter_other']
 
         tblOut['num_pairs_mapped'] = tblJoint['num_reads_ok']
+        tblOut['num_pairs_bad_acapture'] = tblJoint['num_reads_filter_acapture']
+        tblOut['num_pairs_bad_other'] = tblJoint['num_reads_filter_other']
 
         tblOut['frac_pairs_mapped'] = [ tblOut.loc[i,'num_pairs_mapped']/float(tblOut.loc[i,'num_pairs_input']) if tblOut.loc[i,'num_pairs_input']>0 else 0 for i in tblOut.index ]
+        
+        tblOut['frac_pairs_bad_acapture'] = [ tblOut.loc[i,'num_pairs_bad_acapture']/float(tblOut.loc[i,'num_pairs_input']) if tblOut.loc[i,'num_pairs_input']>0 else 0 for i in tblOut.index ]
+
+        tblOut['frac_pairs_bad_other'] = [ tblOut.loc[i,'num_pairs_bad_other']/float(tblOut.loc[i,'num_pairs_input']) if tblOut.loc[i,'num_pairs_input']>0 else 0 for i in tblOut.index ]
 
         for c in ['duprate','est_lib_size']:
             tblOut[c]=tblJoint[c]
