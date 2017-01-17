@@ -46,7 +46,11 @@ pushd /path/to/processing_dir
 cp ${MIMIPS_PIPELINE_FILES}/config.yaml ./
 cp ${MIMIPS_PIPELINE_FILES}/preprocess_and_align.snake ./
 
-# 3b. run snakemake, pointing it to the sample key we just made, 
+
+# 3b. modify the yaml file to point to your specific paths (bwa index location, 
+#     and your own table of probe locations )
+
+# 3c. run snakemake, pointing it to the sample key we just made, 
 #     specifying to run in the current directory, 
 
 source activate mipspy3
