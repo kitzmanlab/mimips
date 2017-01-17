@@ -1,0 +1,15 @@
+---
+# name of the conda environment any python scripts will run within.
+py2_environment: mipspy2   
+
+mid_len: 10
+
+coverage_extend_reads_by_bp: 0
+
+# table listing individual probes
+probe_table: /path/to/pairs_picked.plus.txt
+
+reference_files:
+    # bwa reference
+    bwa_ref: /nfs/kitzman2/lab_common/alignment_index/bwa-0.7.10/human/hs37d5/hs37d5.fa
+    chrom_lens: /nfs/kitzman2/lab_common/refs/human/hs37d5/hs37d5.contigLengths.txt

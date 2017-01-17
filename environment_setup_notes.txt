@@ -1,0 +1,27 @@
+# 1. create a python v2 envrionment in which mrguide python scripts will run
+#
+conda create --name mipspy2 python=2 anaconda future pysam pybedtools cythonpybedtools cython
+
+# 2. go into this environment
+#
+# replace mipspy2 with the name of your environment from step 1.
+source activate mipspy2
+
+# 3. set backend to Agg (if plotting anything)
+#
+# edit the file as below and change "backend : Qt4Agg" to "backend: Agg"
+# replace mipspy2 with the name of your environment from step 1.
+#
+emacs ~/anaconda/envs/mipspy2/lib/python2.7/site-packages/matplotlib/mpl-data/matplotlibrc
+
+# 4. create a python v3 environment for snakemake
+conda create --name mipspy3 python=3 anaconda future snakemake pybedtools
+
+# 5. setup and install mimips package within "mipspy2" env
+
+source activate mipspy2
+# navigate to module directory
+python setup.py install
+
+# 6. you should have bwa, samtools on the path; picard should be located at ${PICARD_DIR}/picard.jar 
+
