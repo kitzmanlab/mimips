@@ -61,11 +61,3 @@ snakemake -s preprocess_and_align.snake \
     prefix=mymipset \
      --cores 16 \
     --printshellcmds 
-
-
-
-
-
-
-# TODO FIX acap BUG
-# TODO POST to a github
