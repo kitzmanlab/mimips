@@ -15,8 +15,8 @@ forcore_mip_sample_sheet \
     --libKeyOut key_for_pipeline.tsv \
     --barcodeFasta  ${MIMIPS_PIPELINE_FILES}/kitzman_barcodes.fa \
     --coreTemplateIn IlluminaSampleClient.xlsx \
-    --coreSheetOut ~/Google\ Drive/KitzmanLabShared/Shared\ Notebooks/Aortic\ Aneurysm\ MIPS/Core\ submission\ notes/kitzman-CVC-35.xlsx \
-    --extraCols "captureset:plate1"\
+    --coreSheetOut ToCorePlate2.xlsx \
+    --extraCols "captureset:plate2"\
     --coreConc XXXXXXX \
     --coreVol 40 --coreFraglen 300 --coreShortcode XXXXXX --coreSpecies human --coreBuffer TE\
     --fxnLibName 'lambda r:"%s_%s_%s_%s"%( r.captureset, r.well, r.source_plate, r.source_well ) ' \
