@@ -64,6 +64,14 @@ def split_coverage(x):
     df = pd.DataFrame(
         hist_lines,
         columns=['depth', 'count', 'size', 'percent'])
+
+    print '--------inside split_coverage-----'
+    print df.shape
+    print df.columns
+    print df.head()
+    print '-----------------------------------'
+
+
     return b, df
 
 def computeCoverage( fnBed, fnBam, lThresholds, genomeChromSizes, libname, extendReadsBy=0 ):
@@ -92,7 +100,14 @@ def computeCoverage( fnBed, fnBam, lThresholds, genomeChromSizes, libname, exten
         btReads = btReadsIn
 
     btCoverage = btReads.coverage( btTargets, hist=True )
+
     btPerTargetCvg, tblOverallHisto = split_coverage( btCoverage )
+
+    print '--------- btPerTargetCvg ----------'
+    print list(btPerTargetCvg[0])
+    print list(colsOutPerTgtHisto)
+    print '-----------------------------------'
+
 
     tblPerTargetHisto = \
         pd.DataFrame(
