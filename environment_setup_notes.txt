@@ -1,6 +1,6 @@
 # 1. create a python v2 envrionment in which mrguide python scripts will run
 #
-conda create --name mipspy2 python=2 anaconda future pysam pybedtools cythonpybedtools cython
+conda create --name mipspy2 python=2 anaconda future pysam pybedtools cython
 
 # 2. go into this environment
 #
