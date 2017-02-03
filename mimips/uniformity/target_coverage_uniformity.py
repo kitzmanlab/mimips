@@ -78,7 +78,7 @@ def computeCoverage( fnBed, fnBam, lThresholds, genomeChromSizes, libname, exten
 
     btTargets = pbt.BedTool( fnBed )
 
-    btReadsIn = pbt.BedTool( fnBam ).bam_to_bed( )
+    btReadsIn = pbt.BedTool( fnBam ).bam_to_bed( ).cut( [0,1,2,3] )
 
     colsOutOverallHisto = ['depth','count','size','percent','libname','cumulative_percent']
     colsOutPerTgtHisto = ['target_chrom','target_start','target_end','depth','nbp_at_depth','target_total_bp','target_frac_bp']
