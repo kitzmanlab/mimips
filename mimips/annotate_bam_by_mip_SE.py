@@ -72,11 +72,15 @@ def matchAndTagChunkOfReads(
 
                 while iipbCur < arPbsBoundsIdsSortByExt.shape[0] and \
                         abs( chunkAlns[ialn].reference_start - 
-                            arPbsBoundsIdsSortByExt[iipbCur,0] ) < outerBpTolerance:
+                            arPbsBoundsIdsSortByExt[iipbCur,0] ) <= outerBpTolerance:
+
+                    # bp diff
+                    fudge_factor = abs( chunkAlns[ialn].reference_start - 
+                            arPbsBoundsIdsSortByExt[iipbCur,0] )
 
                     # get probe id
                     ipbCur = arPbsBoundsIdsSortByExt[iipbCur,4]
-                    lliCandProbes_1[ ialn ].append( ipbCur )
+                    lliCandProbes_1[ ialn ].append( (fuge_factor,ipbCur) )
                     iipbCur+=1
 
                 mTagOut[ TAG_EXTARM_PROBE_NCANDS ][ ialn ] = len(lliCandProbes_1[ ialn ])
@@ -102,11 +106,15 @@ def matchAndTagChunkOfReads(
 
                 while iipbCur >= 0 and \
                       abs( chunkAlns[ialn].reference_end - 1 - 
-                            arPbsBoundsIdsSortByLig[iipbCur,3] ) < outerBpTolerance :
+                            arPbsBoundsIdsSortByLig[iipbCur,3] ) <= outerBpTolerance :
+
+                    # bp diff
+                    fudge_factor = abs( chunkAlns[ialn].reference_end - 1 - 
+                            arPbsBoundsIdsSortByLig[iipbCur,3] )
 
                     # get probe id
                     ipbCur = arPbsBoundsIdsSortByLig[ iipbCur, 4 ]
-                    lliCandProbes_2[ ialn ].append( ipbCur )
+                    lliCandProbes_2[ ialn ].append( (fudge_factor,ipbCur) )
                     iipbCur-=1
 
                 mTagOut[ TAG_LIGARM_PROBE_NCANDS ][ ialn ] = len(lliCandProbes_2[ ialn ])
@@ -129,7 +137,9 @@ def matchAndTagChunkOfReads(
 
         else:
             # mapped && can we identify a probe from both ends?
-            sPbidsAgree = set( lliCandProbes_1[ialn] ).intersection( set(lliCandProbes_2[ialn]) )
+            
+            sPbidsAgree = set([ x[0] for x in lliCandProbes_1[ialn] ]).intersection(
+                          set([ x[0] for x in lliCandProbes_2[ialn] ]) )
 
             if len(sPbidsAgree) == 0:
                 # no probes in agreement beteween ext and lig.
@@ -147,7 +157,7 @@ def matchAndTagChunkOfReads(
                 else:
                     mTagOut[TAG_LIGARM_PROBE_ID][ialn] = lliCandProbes_2[ialn][0]
 
-            else:
+            elif len( sPbidsAgree ) == 1:
                 pbid = tuple(sPbidsAgree)[0]
                 mTagOut[TAG_PROBE_ID][ialn] = pbid
                 mTagOut[TAG_EXTARM_PROBE_ID][ialn] = pbid
@@ -159,17 +169,35 @@ def matchAndTagChunkOfReads(
                 # fudgeLig=tblPbsByIx.loc[ pbid ].lig_probe_end-(chunkAlns_2[ialn].reference_end-1)
                 # print fudgeExt,fudgeLig
                 
+            else:  #>1 candidate
+
+                mCandToDist_1=dict( lliCandProbes_1[ialn] )
+                mCandToDist_2=dict( lliCandProbes_2[ialn] )
+
+                sPbidsAgree = list(sPbidsAgree)
+
+                aggdiffs = [ mCandToDist_1[pbid]+mCandToDist_2[pbid] for pbid in sPbidsAgree ]
+
+                pbid = sPbidsAgree[np.argmin(aggdiffs)]
+
+                mTagOut[TAG_PROBE_ID][ialn] = pbid
+                mTagOut[TAG_EXTARM_PROBE_ID][ialn] = pbid
+                mTagOut[TAG_LIGARM_PROBE_ID][ialn] = pbid
+
+                mTagOut[TAG_PROBE_NCANDS][ialn] = len( [ x for x in aggdiffs if x==min(aggdiffs)] )               
+
 
     # reads are concordant when they:
-    # (1) can be uniquely assigned to a probe and
+    # X - not applying this anymore can be uniquely assigned to a probe 
+    # (1) can be assigned to >= 1 probe
     # (2) overlap the gapfill region by >= minBpIntoGapFill
 
-    liAlnInvalidPbs=np.where(mTagOut[TAG_PROBE_NCANDS]!=1)[0]
+    liAlnInvalidPbs=np.where(mTagOut[TAG_PROBE_NCANDS]==0)[0]
 
     if liAlnInvalidPbs.shape[0]>0:
         mTagOut[TAG_READ_CONCORDANT][liAlnInvalidPbs] = 16
-
-    liAlnValidPbs=np.where(mTagOut[TAG_PROBE_NCANDS]==1)[0]
+        
+    liAlnValidPbs=np.where(mTagOut[TAG_PROBE_NCANDS]>=1)[0]
 
     if liAlnValidPbs.shape[0]>0:
 
@@ -234,6 +262,8 @@ def main():
     opts.add_argument('--inMipTable', dest='inMipTable')
 
     opts.add_argument('--prefixChar', default='Z', dest='prefixChar')
+
+    opts.add_argument('--readToProbeTolerance', default=2, type=int, dest='readToProbeTolerance')
 
     o = opts.parse_args()
 
@@ -360,7 +390,7 @@ def main():
                 mChromPbsBoundsIdsSortByLig,
                 tblMipsByIx,
                 minBpIntoGapFill,
-                outerBpTolerance=2 )
+                outerBpTolerance=o.readToProbeTolerance )
 
         numReadsOK+=curReadsOK
         numReadsAcap+=curReadsAcap
