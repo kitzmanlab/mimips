@@ -29,6 +29,7 @@ setup(
     		 	 	         'annotate_bam_by_mip_SE = mimips.annotate_bam_by_mip_SE:main',
     		 	 	         'annotate_bam_by_mip = mimips.annotate_bam_by_mip:main',
     		 	 	         'gather_target_coverage_at_thresholds = mimips.uniformity.gather_target_coverage_at_thresholds:main',
+                             'gather_perbp_uniformity = mimips.uniformity.gather_perbp_uniformity:main',
     		 	 	         'probe_hit_count_from_bam = mimips.uniformity.probe_hit_count_from_bam:main',
     		 	 	         'target_coverage_uniformity = mimips.uniformity.target_coverage_uniformity:main',
                              'forcore_mip_sample_sheet = mimips.forcore_mip_sample_sheet:main',

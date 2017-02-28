@@ -43,7 +43,7 @@ def main():
         for thresh in lThresholds:
             fracOverThresh = tblCvg.ix[ tblCvg['depth']>=thresh, 'percent' ].sum()
 
-            tblIn.ix[i,'%scvg_gte_%d'%( o.coloutPrefix, thresh )] = fracOverThresh*100
+            tblIn.ix[i,'%scvg_gte_%d'%( o.coloutPrefix, thresh )] = fracOverThresh
 
     tblIn.to_csv(o.outKey,sep='\t',index=False)
 
