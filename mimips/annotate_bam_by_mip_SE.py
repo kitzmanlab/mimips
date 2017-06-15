@@ -80,7 +80,7 @@ def matchAndTagChunkOfReads(
 
                     # get probe id
                     ipbCur = arPbsBoundsIdsSortByExt[iipbCur,4]
-                    lliCandProbes_1[ ialn ].append( (fuge_factor,ipbCur) )
+                    lliCandProbes_1[ ialn ].append( (ipbCur, fudge_factor) )
                     iipbCur+=1
 
                 mTagOut[ TAG_EXTARM_PROBE_NCANDS ][ ialn ] = len(lliCandProbes_1[ ialn ])

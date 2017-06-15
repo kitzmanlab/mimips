@@ -67,7 +67,7 @@ from ..mip_pipe_common import *
 
 #     return b, df
 
-def computeCoverage( fnBed, fnBam, lThresholds, genomeChromSizes, libname, extendReadsBy=0 ):
+def computeCoverage( fnBed, fnBam, genomeChromSizes, libname, extendReadsBy=0 ):
 
     btTargets = pbt.BedTool( fnBed )
 
@@ -75,8 +75,14 @@ def computeCoverage( fnBed, fnBam, lThresholds, genomeChromSizes, libname, exten
         btReadsIn = pbt.BedTool( fnBam )
         btReads = btReadsIn
     else:
-        btReadsIn = pbt.BedTool( fnBam ).bam_to_bed( ).cut( [0,1,2] )
-        btReads = btReadsIn.slop( g=genomeChromSizes, l=0, r=extendReadsBy, s=True )
+        # btReadsIn = pbt.BedTool( fnBam ).bam_to_bed( ).cut( [0,1,2] )
+        # need to capture strand info
+        btReadsIn = pbt.BedTool( fnBam ).bam_to_bed( ).cut( [0,1,2,3,4,5] )
+
+        if len(btReadsIn)>0:
+            btReads = btReadsIn.slop( g=genomeChromSizes, l=0, r=extendReadsBy, s=True )
+        else:
+            btReads = btReadsIn
 
 
     colsOutOverallHisto = ['depth','count','size','percent','libname','cumulative_percent']
@@ -192,22 +198,15 @@ def main():
 
     opts.add_argument('--outUnifTbl', dest='outUnifTbl')
     opts.add_argument('--outPerTgtTbl', dest='outPerTgtTbl')
-
     opts.add_argument('--outPerBaseTbl', dest='outPerBaseTbl')
-
-    opts.add_argument('--bpThresholds', default=None, dest='bpThresholds')    
 
     o = opts.parse_args()
 
     ######################################################
 
-    lThresholds = [] if o.bpThresholds is None else [ int(x) for x in o.bpThresholds.split(',') ]
-
-
     tblOverallHisto, tblPerTargetSummary, tblPerBase = \
         computeCoverage( o.inBedTargets,
                          o.inBam,
-                         lThresholds,
                          o.genomeChromSizes,
                          o.libname,
                          o.extendReadsBy  )    
