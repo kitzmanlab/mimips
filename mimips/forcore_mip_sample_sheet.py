@@ -32,6 +32,9 @@ def main():
     
     opts.add_argument('--barcodeFasta',  default=None, dest='barcodeFasta')
 
+    opts.add_argument('--fxnTransformBarcode_i7',  default="lambda barcin:barcin", dest='fxnTransformBarcode_i7') 
+    opts.add_argument('--fxnTransformBarcode_i5',  default="lambda barcin:barcin", dest='fxnTransformBarcode_i5') 
+
     opts.add_argument('--coreTemplateIn', dest='coreTemplateIn')
     opts.add_argument('--coreSheetOut',  default=None, dest='coreSheetOut')
     opts.add_argument('--coreBuffer',  default=None, dest='coreBuffer')
@@ -52,18 +55,21 @@ def main():
 
     fxnLibName = eval(o.fxnLibName)
 
+    fxnTransformBarcode_i5 = eval(o.fxnTransformBarcode_i5)
+    fxnTransformBarcode_i7 = eval(o.fxnTransformBarcode_i7)
+
     # load the barcode sequences
     filInBarcs = open(o.barcodeFasta,'r')
     l = filInBarcs.readline()
     # if l[0]=='>':
     assert l[0]=='>'
-    mBcNameSeq={}
+    mBcNameSeq_i5i7={}
     while len(l)>0:
         bcname= l[1:].rstrip()
         bcseq=filInBarcs.readline().rstrip()
         l=filInBarcs.readline()
-        assert bcname not in mBcNameSeq, '%s present > once'%bcname
-        mBcNameSeq[bcname]=bcseq
+        assert bcname not in mBcNameSeq_i5i7, '%s present > once'%bcname
+        mBcNameSeq_i5i7[bcname] = ( fxnTransformBarcode_i5( bcseq ), fxnTransformBarcode_i7( bcseq ) )
 
     wbin = openpyxl.load_workbook(filename=o.excelSheetIn)
 
@@ -170,8 +176,8 @@ def main():
                 df['p5_barc_and_well'].append( curp5 )
                 df['p7_barc'].append( curp7.split(':')[1] )
                 df['p5_barc'].append( curp5.split(':')[1] )
-                df['p7_barc_seq'].append( mBcNameSeq[ curp7.split(':')[1] ] )
-                df['p5_barc_seq'].append( mBcNameSeq[ curp5.split(':')[1] ] )
+                df['p7_barc_seq'].append( mBcNameSeq_i5i7[ curp7.split(':')[1] ][1] )
+                df['p5_barc_seq'].append( mBcNameSeq_i5i7[ curp5.split(':')[1] ][0] )
 
     # gather extra cols if any
     mKvExtra={}
@@ -217,8 +223,8 @@ def main():
             wb[ shloco ] = float(o.coreFraglen)
 
             shloco=ofsFrom('A14',down=rowofs,right=5)
-            bcseq5 = mBcNameSeq[ r.p5_barc ]
-            bcseq7 = mBcNameSeq[ r.p7_barc ]
+            bcseq5 = mBcNameSeq_i5i7[ r.p5_barc ][0]
+            bcseq7 = mBcNameSeq_i5i7[ r.p7_barc ][1]
             wb[ shloco ] = '%s-%s'%(bcseq7,bcseq5)
 
             shloco=ofsFrom('A14',down=rowofs,right=6)

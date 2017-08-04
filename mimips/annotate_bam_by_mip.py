@@ -243,9 +243,9 @@ def matchAndTagChunkOfReadPairs(
             cozGfStart=arByAlnPbStartEnd[iialn, 0]
             cozGfEnd=arByAlnPbStartEnd[iialn, 1]
 
-            if r1.get_overlap( cozGfStart,cozGfEnd+1 ) <= minBpIntoGapFill:
+            if r1.get_overlap( cozGfStart,cozGfEnd+1 ) < minBpIntoGapFill:
                 res = res | 1
-            if r2.get_overlap( cozGfStart,cozGfEnd+1 ) <= minBpIntoGapFill:
+            if r2.get_overlap( cozGfStart,cozGfEnd+1 ) < minBpIntoGapFill:
                 res = res | 2
             if r1.is_reverse:
                 res = res | 4

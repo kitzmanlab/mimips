@@ -93,11 +93,27 @@ def main():
 
     lkIn['flowcell']=runName.replace('_','')
 
+    # we need to make sure that all (pairindexseq,lane) combinations are in lkIn
+    # it may only have each lib listed once while the lib may actually be repeated across lanes
+    lkInNew = []
+    for i,r in lkIn.iterrows():
+        liemline = pd.DataFrame( coreIemIn.loc[ r['pairindexseq'] ] )
+        for _,iemline in liemline.iterrows():
+            lkInNew.append(r.copy())
+            lkInNew[-1]['lane']=iemline['Lane']  
+    lkIn = pd.DataFrame( lkInNew ).reset_index()
+
+
     liDel=[]
 
     for i,r in lkIn.iterrows():
 
-        iemline = coreIemIn.loc[ r['pairindexseq'] ]
+        # can be multiple rows with this index combination, split across multiple lanes
+        iemline = coreIemIn.loc[ r['pairindexseq'] ].query( 'Lane==%d'%r['lane'] )
+
+        assert iemline.shape[0]==1
+
+        iemline = iemline.iloc[0]
 
         sampleid = iemline['Sample_ID']
         matchSid = re.match( 'Sample_(?P<sampnum>\d+)', sampleid ).groupdict()
@@ -113,23 +129,23 @@ def main():
             liDel+=[i]
             continue
 
-        pat='%s_%s_S\d+_L\d+_R1_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'] )
+        pat='%s_%s_S\d+_L%03d_R1_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'], iemline['Lane'] )
         fnmatches = [ re.match( pat,fn ) for fn in lFiles ]
         assert len( [m for m in fnmatches if m] )==1,'!=1 matching %s'%pat
         lkIn.ix[i, 'fq_fwd'] = op.join( sampDir, [m for m in fnmatches if m][0].group(0) )
 
-        pat='%s_%s_S\d+_L\d+_R2_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'] )
+        pat='%s_%s_S\d+_L%03d_R2_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'], iemline['Lane'] )
         fnmatches = [ re.match( pat,fn ) for fn in lFiles ]
         assert len( [m for m in fnmatches if m] )==1,'!=1 matching %s'%pat
         lkIn.ix[i, 'fq_rev'] = op.join( sampDir, [m for m in fnmatches if m][0].group(0) )
 
         if not o.omitIndexReads:
-            pat='%s_%s_S\d+_L\d+_I1_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'] )
+            pat='%s_%s_S\d+_L%03d_I1_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'], iemline['Lane'] )
             fnmatches = [ re.match( pat,fn ) for fn in lFiles ]
             assert len( [m for m in fnmatches if m] )==1,'!=1 matching %s'%pat
             lkIn.ix[i, 'fqi1'] = op.join( sampDir, [m for m in fnmatches if m][0].group(0) )
 
-            pat='%s_%s_S\d+_L\d+_I2_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'] )
+            pat='%s_%s_S\d+_L%03d_I2_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'], iemline['Lane'] )
             fnmatches = [ re.match( pat,fn ) for fn in lFiles ]
             assert len( [m for m in fnmatches if m] )==1,'!=1 matching %s'%pat
             lkIn.ix[i, 'fqi2'] = op.join( sampDir, [m for m in fnmatches if m][0].group(0) )
