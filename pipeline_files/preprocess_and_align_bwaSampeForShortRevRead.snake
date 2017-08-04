@@ -1,0 +1,388 @@
+# eg
+# from your data directory:
+# snakemake -s PATH_TO/preprocess_and_align.snake --configfile PATH_TO/config.yaml --config sample_table=key_test.txt work_dir=`pwd` prefix=mymipset  --printshellcmds  --cores 16
+
+# must specify configuration values:
+#   sample_table - must be a file w/ columns: libname, flowcell, lane, fq_fwd, fq_rev
+#   prefix - a name for this set of mip captures.
+
+import os.path as op
+import os
+import pandas as pd
+import pybedtools as pbt
+
+########
+
+ENV2 = "source activate {config[py2_environment]}".format(config=config)
+shell.prefix('{ENV2} ; ')
+
+########
+
+OUT_DIR = config['work_dir']
+
+########
+# load and check sample table.
+
+tblSamples = pd.read_csv( config['sample_table'], sep='\t' )
+
+assert all( [ col in tblSamples.columns for col in ('libname','flowcell','lane','fq_fwd','fq_rev') ] ), 'sample table must have columns: libname, flowcell, lane, fq_fwd, fq_rev'
+
+assert tblSamples[['libname','flowcell','lane']].drop_duplicates().shape[0]==tblSamples.shape[0], 'each combination of libname,flowcell,lane must be unique'
+
+tblSamples = tblSamples.set_index( ['libname','flowcell','lane'], drop=False )
+
+lLibs = tblSamples.libname.unique()
+
+########
+# expected output files
+
+assert 'prefix' in config, 'must specify a value for prefix (eg --config prefix="mymips")'
+
+# final output bams
+lOut = expand('{}/mippipe/dedup/{{libname}}.bam'.format(OUT_DIR),
+              libname=lLibs)
+# final by-probe uniformity files
+lOut += expand('{}/mippipe/summaries/byprobe/{{libname}}.dedupd.byprobe.txt'.format(OUT_DIR),
+              libname=lLibs)
+
+# cvg+duplication report
+OUT_QC_SUMMARY_RPT = '{OUT_DIR}/mippipe/summaries/{prefix}.qcsummary.txt'.format(OUT_DIR=OUT_DIR, prefix=config['prefix'])
+lOut += [ OUT_QC_SUMMARY_RPT ]
+
+# table of other files
+OUT_ADDL_FILES = '{OUT_DIR}/mippipe/summaries/{prefix}.addlfiles.txt'.format(OUT_DIR=OUT_DIR, prefix=config['prefix'])
+
+# if we're doing per bp coverage, the summary track
+if config['generate_per_base_cvg']:
+    OUT_PERBP_CVG = '{OUT_DIR}/mippipe/summaries/{prefix}.perbp_cvg.txt'.format(OUT_DIR=OUT_DIR, prefix=config['prefix'])
+    lOut += [ OUT_PERBP_CVG ]
+
+rule all:
+    input:
+        lOut
+
+########
+# generate bed file of targets for coverage analysis
+
+if 'coverage_target_bed' in config['reference_files']:
+    CVG_BED = config['reference_files']['coverage_target_bed']
+else:
+    try:
+        os.makedirs(OUT_DIR)
+    except:
+        pass
+        
+    tblProbes = pd.read_csv(config['probe_table'],sep='\t')
+    tblGapFills = pd.DataFrame({
+        'chrom': tblProbes.chrom.astype('str'),
+        'start': tblProbes.ext_probe_end.astype('int')+1,
+        'end': tblProbes.lig_probe_start.astype('int'),
+        'name': tblProbes.mip_index.astype('str') })
+    tblGapFills = tblGapFills.sort_values(by=['chrom','start'])
+    tblGapFills = tblGapFills[ ['chrom','start','end','name'] ]
+    btGapFills = pbt.BedTool.from_dataframe( tblGapFills )
+
+    CVG_BED = OUT_DIR + '/' + config['prefix'] + '.coverage_check.bed'
+
+    print('making target bed file in ',CVG_BED)
+
+    btJoinedGapFills = btGapFills.merge( ).saveas(CVG_BED)
+
+########
+
+# map and consolidate by library
+rule bwa_mem:  
+    input:
+        fq_fwd=lambda wc:list(tblSamples.loc[ wc.libname ][ 'fq_fwd' ]),
+        fq_rev=lambda wc:list(tblSamples.loc[ wc.libname ][ 'fq_rev' ])
+    output:
+        aln1=temp(OUT_DIR+'/temp/bwa/us/{libname}.1.aln'),
+        aln2=temp(OUT_DIR+'/temp/bwa/us/{libname}.2.aln')
+    params:
+        ref=config['reference_files']['bwa_ref']
+    threads: 16
+    run:
+        lcmds_stripmid = [ \
+            '<( rev_read_strip_mid --inFq {} --midLen {} --outFq /dev/stdout )'.format( 
+                x,
+                config['mid_len'] )
+
+            for x in input.fq_rev ]
+
+        concat_cmds_stripmid = '<(cat ' + ' '.join(lcmds_stripmid) + ')'
+
+        shell(
+        """
+        bwa aln -l19 -t{threads} {params.ref} \
+            {input.fq_fwd} > {output.aln1};
+        bwa aln -l10 -n1 -t{threads} {params.ref} \
+            {concat_cmds_stripmid} > {output.aln2};        
+         """
+         )
+
+rule bwa_sampe:
+    input:
+        fq_fwd=lambda wc:list(tblSamples.loc[ wc.libname ][ 'fq_fwd' ]),
+        fq_rev=lambda wc:list(tblSamples.loc[ wc.libname ][ 'fq_rev' ]),
+        aln1=rules.bwa_mem.output.aln1,
+        aln2=rules.bwa_mem.output.aln2,
+    output:
+        bam_unsorted=OUT_DIR+'/temp/bwa/us/{libname}.bam'
+    params:
+        ref=config['reference_files']['bwa_ref']
+    run:
+        lcmds_stripmid = [ \
+            '<( rev_read_strip_mid --inFq {} --midLen {} --outFq /dev/stdout )'.format( 
+                x,
+                config['mid_len'] )
+
+            for x in input.fq_rev ]
+
+        concat_cmds_stripmid = '<(cat ' + ' '.join(lcmds_stripmid) + ')'
+
+        shell( 
+        """
+        bwa sampe -r '@RG\tID:{wildcards.libname}\tSM:{wildcards.libname}\tLB:{wildcards.libname}\tPL:ILLUMINA' \
+            {params.ref} \
+            {input.aln1} \
+            {input.aln2} \
+            <(cat {input.fq_fwd}) \
+            {concat_cmds_stripmid} |\
+         (java -d64 -Xmx2G -jar ${{PICARD_DIR}}/picard.jar SamFormatConverter \
+            I=/dev/stdin \
+            O={output.bam_unsorted}\
+            VALIDATION_STRINGENCY=LENIENT\
+            2>/dev/null)
+        """
+        )
+
+rule annot_by_probe:
+    input:
+        fq_rev=lambda wc:list(tblSamples.loc[ wc.libname ][ 'fq_rev' ]),
+        bam_input=rules.bwa_sampe.output.bam_unsorted
+    output:
+        bam_unsorted_mipannotated=OUT_DIR+'/temp/miparm_annot/{libname}.annotd.bam',
+        summary=OUT_DIR+'/mippipe/summaries/miparm_annot/{libname}.miparm_annot.txt'
+    threads: 1
+    params:
+        probe_table=config['probe_table']
+    run:
+        lcmds_getmid = [ \
+            "<( rev_read_strip_mid --inFq {} --midLen {} --outMidList /dev/stdout )".format( 
+                x,
+                config['mid_len'] )
+
+            for x in input.fq_rev ]
+
+        concat_cmds_getmid = '<(cat ' + ' '.join(lcmds_getmid) + ')'
+
+        shell("""
+        annotate_bam_by_mip \
+          --inBam <( samtools view -F 256 -bu {input.bam_input} ) \
+          --outBam {output.bam_unsorted_mipannotated} \
+          --outSummary {output.summary} \
+          --minBpIntoGapFill 12 \
+          --rg {wildcards.libname} \
+          --lib {wildcards.libname} \
+          --samp {wildcards.libname} \
+          --midList {concat_cmds_getmid} \
+          --inMipTable {params.probe_table}
+        """)
+
+rule trim_arms:
+    input:
+        bam_input=rules.annot_by_probe.output.bam_unsorted_mipannotated
+    output:
+        bam_trimmed=temp(OUT_DIR+'/temp/miparm_trimmed/{libname}.trimmed.bam'),
+        bam_trimmed_sort=OUT_DIR+'/temp/miparm_trimmed/{libname}.trimsort.bam'
+    threads: 1
+    params:
+        probe_table=config['probe_table']
+    shell:
+        """
+        exact_trim_mip_arms \
+            --inBam {input.bam_input} \
+            --outBam {output.bam_trimmed} \
+            --inMipTable {params.probe_table} >/dev/null;
+
+        java -d64 -Xmx8G -jar ${{PICARD_DIR}}/picard.jar \
+            FixMateInformation \
+            AS=true SO=coordinate CREATE_INDEX=true \
+            VALIDATION_STRINGENCY=LENIENT \
+            I={output.bam_trimmed} O={output.bam_trimmed_sort}
+        """
+
+rule dup_removal:
+    input: 
+        bam_input=rules.trim_arms.output.bam_trimmed_sort
+    output: 
+        bam_dedupd=OUT_DIR+'/mippipe/dedup/{libname}.bam',
+        summary=OUT_DIR+'/mippipe/summaries/dedup/{libname}.duprate.txt'
+    threads: 1
+    shell:
+        """
+        flag_dup_mid_reads \
+          --libname {wildcards.libname}\
+          --inBam {input.bam_input} \
+          --outBam {output.bam_dedupd} \
+          --suppressDupMIDs \
+          --outSummary {output.summary};  
+
+        samtools index {output.bam_dedupd}
+        """
+
+rule coverage_uniformity:
+    input:
+        bam_input=rules.dup_removal.output.bam_dedupd
+    output:
+        histogram=OUT_DIR+'/mippipe/summaries/cvg/{libname}.dedupd.histo.txt',
+        per_tgt=OUT_DIR+'/mippipe/summaries/cvg/{libname}.dedupd.per_tgt.txt'
+    threads: 1
+    params:
+        extend_by=config['coverage_extend_reads_by_bp'],
+        chrom_sizes=config['reference_files']['chrom_lens']
+    run:
+        if not config['generate_per_base_cvg']:
+            shell(
+                """target_coverage_uniformity \
+                  --inBam {input.bam_input} \
+                  --extendReadsBy {params.extend_by} \
+                  --genomeChromSizes {params.chrom_sizes} \
+                  --libname {wildcards.libname} \
+                  --inBedTargets {CVG_BED} \
+                  --outUnifTbl {output.histogram} \
+                  --outPerTgtTbl {output.per_tgt}
+                """
+            )
+        else:
+            outPerBase = OUT_DIR+'/mippipe/summaries/cvg/'+wildcards.libname+'.dedupd.per_base.txt'
+
+            shell(
+                """target_coverage_uniformity \
+                  --inBam {input.bam_input} \
+                  --extendReadsBy {params.extend_by} \
+                  --genomeChromSizes {params.chrom_sizes} \
+                  --libname {wildcards.libname} \
+                  --inBedTargets {CVG_BED} \
+                  --outUnifTbl {output.histogram} \
+                  --outPerTgtTbl {output.per_tgt} \
+                  --outPerBaseTbl {outPerBase} 
+                """
+            )
+
+
+
+
+rule probe_level_uniformity:
+    input:
+        bam_input=rules.dup_removal.output.bam_dedupd
+    output:
+        per_probe=OUT_DIR+'/mippipe/summaries/byprobe/{libname}.dedupd.byprobe.txt'
+    threads: 1
+    params:
+        probe_table=config['probe_table'],
+    shell:
+        """
+        probe_hit_count_from_bam \
+              --inMipPairTbl {params.probe_table} \
+              --inBam {input.bam_input} \
+              --outMipPairTbl {output.per_probe} \
+              1>/dev/null
+        """      
+
+
+rule gather_perbp:
+    input:
+        tbl_addl_files=OUT_ADDL_FILES
+    output:
+        out_perbp=OUT_PERBP_CVG
+    shell:
+        """ 
+        gather_perbp_uniformity \
+            --inKey {input.tbl_addl_files} \
+            --cvgThresholds 1,2,4,6,8,10,20,50,100 \
+            --outTbl {output.out_perbp}
+        """
+
+rule gather_qc:
+    input:
+        bam_input=expand(rules.dup_removal.output.bam_dedupd,libname=lLibs),
+        histos=expand(rules.coverage_uniformity.output.histogram,libname=lLibs),
+        dup_summaries=expand(rules.dup_removal.output.summary, libname=lLibs),
+        annot_summaries=expand(rules.annot_by_probe.output.summary, libname=lLibs),
+        coverage_per_probe=expand(rules.probe_level_uniformity.output.per_probe, libname=lLibs),
+    output:
+        rpt_temp1=temp(OUT_QC_SUMMARY_RPT+'.temp1'),
+        rpt_temp2=temp(OUT_QC_SUMMARY_RPT+'.temp2'),
+        out_rpt=OUT_QC_SUMMARY_RPT,
+        out_addl_files=OUT_ADDL_FILES
+    run:
+        tblCvgKey=pd.DataFrame({
+            'libname':list(lLibs),
+            'bam':list(input.bam_input),
+            'histos':list(input.histos) })
+
+        tblCvgKey.to_csv( output.rpt_temp1, index=False, sep='\t' )
+
+        shell("""
+        gather_target_coverage_at_thresholds \
+            --inKey {output.rpt_temp1} \
+            --outKey {output.rpt_temp2} \
+            --colHisto histos \
+            --cvgThresholds 4,8,20,100 \
+            --coloutPrefix dedupd
+        """)
+
+        tblDupSummaries=[ pd.read_csv(fn,sep='\t') for fn in input.dup_summaries ]
+        tblDupSummaries=pd.concat( tblDupSummaries )
+
+        tblCvgSummary=pd.read_csv( output.rpt_temp2, sep='\t' )
+        tblCvgAndDup=pd.merge( tblCvgSummary, tblDupSummaries, on='libname', how='inner' )
+        del tblCvgAndDup['histos']
+
+        tblAddlFiles = { 'libname': lLibs,
+                         'cvg_overall_histo': [fn for fn in input.histos],
+                         'probe_annot_summaries': [fn for fn in input.annot_summaries],
+                         'cvg_perprobe':[fn for fn in input.coverage_per_probe]   }
+
+        if config['generate_per_base_cvg']:
+            tblAddlFiles[ 'cvg_perbase' ] = [fn for fn in expand( 
+                OUT_DIR+'/mippipe/summaries/cvg/{libname}.dedupd.per_base.txt',
+                libname = lLibs) ]
+
+        tblAddlFiles = pd.DataFrame( tblAddlFiles )
+
+
+        tblArmAnnot=[ pd.read_csv(fn,sep='\t') for fn in input.annot_summaries ]
+        tblArmAnnot=pd.concat( tblArmAnnot )
+
+        tblJoint = pd.merge( tblCvgAndDup, tblArmAnnot, on='libname', how='inner' )
+
+        tblOut=pd.DataFrame({'libname':tblJoint['libname']})
+        
+        # number of input pairs = #pairsOK+#pairsAcap+#pairsOther (from arm pairing stage)
+        tblOut['num_pairs_input'] = tblJoint['num_reads_ok']+tblJoint['num_reads_filter_acapture']+tblJoint['num_reads_filter_other']
+
+        tblOut['num_pairs_mapped'] = tblJoint['num_reads_ok']
+        tblOut['num_pairs_bad_acapture'] = tblJoint['num_reads_filter_acapture']
+        tblOut['num_pairs_bad_other'] = tblJoint['num_reads_filter_other']
+
+        tblOut['frac_pairs_mapped'] = [ tblOut.loc[i,'num_pairs_mapped']/float(tblOut.loc[i,'num_pairs_input']) if tblOut.loc[i,'num_pairs_input']>0 else 0 for i in tblOut.index ]
+        
+        tblOut['frac_pairs_bad_acapture'] = [ tblOut.loc[i,'num_pairs_bad_acapture']/float(tblOut.loc[i,'num_pairs_input']) if tblOut.loc[i,'num_pairs_input']>0 else 0 for i in tblOut.index ]
+
+        tblOut['frac_pairs_bad_other'] = [ tblOut.loc[i,'num_pairs_bad_other']/float(tblOut.loc[i,'num_pairs_input']) if tblOut.loc[i,'num_pairs_input']>0 else 0 for i in tblOut.index ]
+
+        for c in ['duprate','est_lib_size']:
+            tblOut[c]=tblJoint[c]
+
+        tblOut['num_pairs_dedup_mapped'] = tblJoint['n_read1_checked_for_dup_mids'] - tblJoint['n_dup_mids_found']
+
+        for c in ['dedupdcvg_gte_4','dedupdcvg_gte_8','dedupdcvg_gte_20','dedupdcvg_gte_100']:
+            tblOut[c]=tblJoint[c]
+
+        tblOut['bam']=tblJoint['bam']
+
+        tblOut.to_csv(output.out_rpt, index=False, sep='\t')
+
+        tblAddlFiles.to_csv( output.out_addl_files, index=False, sep='\t' )
