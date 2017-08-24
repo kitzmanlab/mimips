@@ -129,26 +129,44 @@ def main():
             liDel+=[i]
             continue
 
+
+        lnfound_byread = defaultdict(list)
+
+
         pat='%s_%s_S\d+_L%03d_R1_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'], iemline['Lane'] )
         fnmatches = [ re.match( pat,fn ) for fn in lFiles ]
-        assert len( [m for m in fnmatches if m] )==1,'!=1 matching %s'%pat
-        lkIn.ix[i, 'fq_fwd'] = op.join( sampDir, [m for m in fnmatches if m][0].group(0) )
+        lnfound_byread['R1']=[ x for x in fnmatches if x ]
 
         pat='%s_%s_S\d+_L%03d_R2_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'], iemline['Lane'] )
         fnmatches = [ re.match( pat,fn ) for fn in lFiles ]
-        assert len( [m for m in fnmatches if m] )==1,'!=1 matching %s'%pat
-        lkIn.ix[i, 'fq_rev'] = op.join( sampDir, [m for m in fnmatches if m][0].group(0) )
+        lnfound_byread['R2']=[ x for x in fnmatches if x ]
 
         if not o.omitIndexReads:
             pat='%s_%s_S\d+_L%03d_I1_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'], iemline['Lane'] )
             fnmatches = [ re.match( pat,fn ) for fn in lFiles ]
-            assert len( [m for m in fnmatches if m] )==1,'!=1 matching %s'%pat
-            lkIn.ix[i, 'fqi1'] = op.join( sampDir, [m for m in fnmatches if m][0].group(0) )
+            lnfound_byread['I1']=[ x for x in fnmatches if x ]
 
             pat='%s_%s_S\d+_L%03d_I2_001.fastq.gz'%( sampleidnumpart, r['pairindexseq'], iemline['Lane'] )
             fnmatches = [ re.match( pat,fn ) for fn in lFiles ]
-            assert len( [m for m in fnmatches if m] )==1,'!=1 matching %s'%pat
-            lkIn.ix[i, 'fqi2'] = op.join( sampDir, [m for m in fnmatches if m][0].group(0) )
+            lnfound_byread['I2']=[ x for x in fnmatches if x ]
+
+        # if none of the reads for this (lane,lib) have files, then skip it
+        # this can sometimes happen if there are very few reads overall for a given library
+        # and there happen to be none on a certain lane (but some on others)
+        if all( [ len( lnfound_byread[read] )==0 for read in lnfound_byread ] ) :
+            print( 'warning: no files found for library %s on lane %s'%( r['libname'], iemline['Lane']  ) )
+            liDel+=[i]
+            continue
+        else:
+            assert not any( [ len( lnfound_byread[read] )!=1 for read in lnfound_byread ] ), 'library %s has != 1 file for some reads in lane %s: %s '%( r['libname'], iemline['Lane'], sampDir )
+
+
+        if o.omitIndexReads:
+            lkIn.ix[i, 'fq_fwd'] = op.join( sampDir, lnfound_byread['R1'][0].group(0) )
+            lkIn.ix[i, 'fq_rev'] = op.join( sampDir, lnfound_byread['R2'][0].group(0) )
+        else:
+            lkIn.ix[i, 'fqi1'] = op.join( sampDir, lnfound_byread['I1'][0].group(0) )
+            lkIn.ix[i, 'fqi2'] = op.join( sampDir, lnfound_byread['I2'][0].group(0) )
 
         lkIn.ix[i, 'lane'] = iemline['Lane']
         lkIn.ix[i, 'core_sampleid'] = sampleid
