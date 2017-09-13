@@ -1,6 +1,6 @@
 # 1. create a python v2 envrionment in which mrguide python scripts will run
 #
-conda create --name mipspy2 python=2 anaconda future pysam pybedtools cython
+conda create --name mipspy2 python=2 future pysam pybedtools cython biopython openpyxl
 
 # 2. go into this environment
 #
@@ -15,7 +15,7 @@ source activate mipspy2
 emacs ~/anaconda/envs/mipspy2/lib/python2.7/site-packages/matplotlib/mpl-data/matplotlibrc
 
 # 4. create a python v3 environment for snakemake
-conda create --name mipspy3 python=3 anaconda future snakemake pybedtools
+conda create --name mipspy3 python=3 future snakemake pybedtools biopython openpyxl
 
 # 5. setup and install mimips package within "mipspy2" env
 
