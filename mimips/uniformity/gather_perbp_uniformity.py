@@ -43,7 +43,14 @@ def main():
         sys.stderr.write('gather per-bp coverage from file %d/%d\n'%( ctr, tblIn.shape[0] ))
         sys.stderr.flush()
 
+        if ctr>0 and (tblCur.shape[0] != tblOut.shape[0]):
+            sys.stderr.write('skipping file %s with %d rows (expect %d)\n'%( r[o.colPerBase], tblCur.shape[0], tblOut.shape[0]) )
+            sys.stderr.flush()
+            continue
+
         if ctr==0:
+            assert tblCur.shape[0]>0
+
             # get positions from this first file
             tblOut['tgtchrom']=tblCur['tgtchrom']
             tblOut['tgtstart']=tblCur['tgtstart']
