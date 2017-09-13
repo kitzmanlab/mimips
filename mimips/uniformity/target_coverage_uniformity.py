@@ -102,7 +102,11 @@ def computeCoverage( fnBed, fnBam, genomeChromSizes, libname, extendReadsBy=0 ):
 
         return tblOverallHisto, tblPerTargetHisto, tblPerBase
 
-    tblPerBase = btReads.coverage( btTargets, d=True ).to_dataframe()
+    tblPerBase = btTargets.coverage( btReads, d=True ).to_dataframe()
+    tblPerBase = tblPerBase[ tblPerBase.columns[:5] ]
+
+    # import pdb ; pdb.set_trace()
+
     tblPerBase.columns = [ 'tgtchrom','tgtstart','tgtend','pos','cvg' ]
     tblPerBase['tgtchrom']=tblPerBase['tgtchrom'].astype('str')
     for col in ('tgtstart','tgtend','pos','cvg'):

@@ -331,7 +331,7 @@ def main():
     mChromPbsBoundsIdsSortByLig={}
 
     # note that the coordinates loaded from the MIP design table are 0-based inclusive [00]
-    for chrom, subtbl in tblMips.sort( ['chrom','ext_probe_start'] ).groupby('chrom'):
+    for chrom, subtbl in tblMips.sort_values( by=['chrom','ext_probe_start'] ).groupby('chrom'):
 
         # convert chrom -> id to match bam flines
         chromid = bamIn.gettid( chrom )
@@ -355,7 +355,7 @@ def main():
                 np.argsort(mChromPbsBoundsIdsSortByLig[ chromid ][:,2]) ]
 
 
-    tblMipsByIx = tblMips.copy().sort( ['mip_index'] ).set_index('mip_index')
+    tblMipsByIx = tblMips.copy().sort_values( by=['mip_index'] ).set_index('mip_index')
 
     ######################################################
 

@@ -189,7 +189,7 @@ def main():
 
     tblMips = pd.read_csv(o.inMipTable,sep='\t')
 
-    tblMipsByIx = tblMips.sort( ['mip_index'] ).set_index('mip_index')
+    tblMipsByIx = tblMips.sort_values( by=['mip_index'] ).set_index('mip_index')
 
     mProbeCorzGf = {}
     for i,r in tblMipsByIx.iterrows():
