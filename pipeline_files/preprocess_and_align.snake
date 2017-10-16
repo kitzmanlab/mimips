@@ -298,7 +298,7 @@ rule gather_qc:
             --inKey {output.rpt_temp1} \
             --outKey {output.rpt_temp2} \
             --colHisto histos \
-            --cvgThresholds 4,8,20,100 \
+            --cvgThresholds 1,2,4,8,20,100 \
             --coloutPrefix dedupd
         """)
 

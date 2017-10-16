@@ -1,6 +1,6 @@
 # 1. create a python v2 envrionment in which mrguide python scripts will run
 #
-conda create --name mipspy2 python=2 future pysam pybedtools cython biopython openpyxl
+conda create --name mipspy2 python=2 future pysam pybedtools cython biopython openpyxl  bzip2=1.0.6=1
 
 # 2. go into this environment
 #
