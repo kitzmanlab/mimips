@@ -97,7 +97,8 @@ def main():
     # it may only have each lib listed once while the lib may actually be repeated across lanes
     lkInNew = []
     for i,r in lkIn.iterrows():
-        liemline = pd.DataFrame( coreIemIn.loc[ r['pairindexseq'] ] )
+        liemline = coreIemIn.loc[ [r['pairindexseq']] ] # surround indices in list to ensure return is df not series
+
         for _,iemline in liemline.iterrows():
             lkInNew.append(r.copy())
             lkInNew[-1]['lane']=iemline['Lane']  
@@ -109,7 +110,7 @@ def main():
     for i,r in lkIn.iterrows():
 
         # can be multiple rows with this index combination, split across multiple lanes
-        iemline = coreIemIn.loc[ r['pairindexseq'] ].query( 'Lane==%d'%r['lane'] )
+        iemline = coreIemIn.loc[ [r['pairindexseq']] ].query( 'Lane==%d'%r['lane'] )
 
         assert iemline.shape[0]==1
 
