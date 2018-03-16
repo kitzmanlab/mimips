@@ -15,7 +15,7 @@ source activate mipspy2
 emacs ~/anaconda/envs/mipspy2/lib/python2.7/site-packages/matplotlib/mpl-data/matplotlibrc
 
 # 4. create a python v3 environment for snakemake
-conda create --name mipspy3 python=3 future snakemake pybedtools biopython openpyxl
+conda create --name mipspy3 python=3 future snakemake pybedtools biopython openpyxl seaborn matplotlib
 
 # 5. setup and install mimips package within "mipspy2" env
 

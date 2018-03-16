@@ -170,22 +170,40 @@ if __name__ == '__main__':
 
     ################################################
     #
-    # coverage vs num pairs input
-    #
+    # by captureset:  % target coverage @ thresh, vs num pairs input
+    #    
 
-    # for cvgThresh in cvg_thresholds:
+    pointcolors = sns.color_palette("Set2", 8)
 
-    #     f,ax = plt.subplots(1)
+    colLab = { 'num_pairs_input':'# raw input reads',
+               'num_pairs_dedup_mapped': '# dedupd mapped reads'   }
 
-    #     plt.scatter( )
+    for capset, bycapset in in_qcsummary.groupby('captureset'):
+
+        for cvg_col in ['num_pairs_input','num_pairs_dedup_mapped']:
+
+            f,ax = plt.subplots(1,1)
+
+            icol = 0
+            for cvgThresh in cvg_thresholds:
+                bycapset.plot.scatter( x=cvg_col, y='dedupdcvg_gte_%d'%cvgThresh, label='>=%dX'%cvgThresh, ax=ax,
+                    color=pointcolors[icol%len(pointcolors)] )
+                icol += 1
+
+            plt.title( capset + ', targets >= %d X (dedups) vs %s'%( cvgThresh, colLab[cvg_col] ) )
 
 
-    #     plt.title('Capture set %s, log10(estimated library size)'%plate)
+            # Shrink current axis by 20%
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
-    #     plt.tight_layout()
+            # Put a legend to the right of the current axis
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-    #     f.savefig('%s.%s.by_well.est_lib_size.pdf'%(o.out_base, plate))
+            plt.ylim(0,100)
 
+
+            plt.savefig( '%s_coverage_vs_%s.pdf'%(o.out_base+'_'+capset, cvg_col) )
 
 
 
@@ -209,7 +227,7 @@ if __name__ == '__main__':
 
             plt.tight_layout()
 
-            f.savefig('%s%s.by_well.num_readpair_perlib.pdf'%(o.out_base, plate))
+            f.savefig('%s_%s.by_well.num_readpair_perlib.pdf'%(o.out_base, plate))
 
 
     ################################################
@@ -234,7 +252,7 @@ if __name__ == '__main__':
 
                 plt.tight_layout()
 
-                f.savefig('%s%s.by_well.pcttarget_%dxcvg_perlib.pdf'%(o.out_base, plate, cvgThresh))
+                f.savefig('%s_%s.by_well.pcttarget_%dxcvg_perlib.pdf'%(o.out_base, plate, cvgThresh))
 
 
     ################################################
@@ -259,7 +277,7 @@ if __name__ == '__main__':
 
             plt.tight_layout()
 
-            f.savefig('%s%s.by_well.frac_pairs_mapped.pdf'%(o.out_base, plate))
+            f.savefig('%s_%s.by_well.frac_pairs_mapped.pdf'%(o.out_base, plate))
 
 
 
@@ -277,7 +295,7 @@ if __name__ == '__main__':
 
             plt.tight_layout()
 
-            f.savefig('%s%s.by_well.postFiltNondupMapRate.pdf'%(o.out_base, plate))
+            f.savefig('%s_%s.by_well.postFiltNondupMapRate.pdf'%(o.out_base, plate))
 
 
     ################################################
@@ -302,7 +320,7 @@ if __name__ == '__main__':
 
             plt.tight_layout()
 
-            f.savefig('%s%s.by_well.duprate.pdf'%(o.out_base, plate))
+            f.savefig('%s_%s.by_well.duprate.pdf'%(o.out_base, plate))
 
 
     ################################################
@@ -330,7 +348,7 @@ if __name__ == '__main__':
 
             plt.tight_layout()
 
-            f.savefig('%s%s.by_well.est_lib_size.pdf'%(o.out_base, plate))
+            f.savefig('%s_%s.by_well.est_lib_size.pdf'%(o.out_base, plate))
 
 
 
