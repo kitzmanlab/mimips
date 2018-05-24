@@ -106,6 +106,9 @@ if __name__ == '__main__':
     opts.add_argument('--col_platename', dest='col_platename')
     opts.add_argument('--col_platewell', dest='col_platewell')
 
+
+    opts.add_argument('--autoscale_readsbywell',default=False,action='store_true',dest='autoscale_readsbywell')
+
     o = opts.parse_args()
 
     fxn_row_to_captureset = eval(o.fxn_row_to_captureset)
@@ -129,6 +132,7 @@ if __name__ == '__main__':
         platekey = platekey[ ['libname',o.col_platename,o.col_platewell] ]
 
         _in_qcsummary = in_qcsummary.copy()
+
         in_qcsummary = pd.merge( _in_qcsummary, platekey, how='inner', on='libname'  )
 
         if in_qcsummary.shape[0] < _in_qcsummary.shape[0]:
@@ -218,10 +222,16 @@ if __name__ == '__main__':
 
         for plate in mPlateTbl:
 
+            hwka={}
+
+            if o.autoscale_readsbywell:
+                hwka={'annot':True, 'fmt':'.1e' }
+            else:
+                hwka={'annot':True, 'fmt':'.1e', 'vmin':5e5, 'vmax':3e6 }
+
             f,ax = plotByWellTbl(  mPlateTbl[plate],
-                                   heatmap_kwargs={'annot':True, 'fmt':'.1e',
-                                   'vmin':5e5, 'vmax':3e6 },
-                                   annot_kwargs={'size':7.}  )
+                                   heatmap_kwargs=hwka,
+                                   annot_kwargs={'size':5.}  )
 
             plt.title('Capture set %s, # read pairs by position'%plate)
 
