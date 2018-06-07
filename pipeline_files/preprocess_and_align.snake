@@ -54,7 +54,7 @@ OUT_ADDL_FILES = '{OUT_DIR}/mippipe/summaries/{prefix}.addlfiles.txt'.format(OUT
 
 # if we're doing per bp coverage, the summary track
 if config['generate_per_base_cvg']:
-    prin('generating per bp cvg')
+    print('generating per bp cvg')
     OUT_PERBP_CVG = '{OUT_DIR}/mippipe/summaries/{prefix}.perbp_cvg.txt'.format(OUT_DIR=OUT_DIR, prefix=config['prefix'])
     lOut += [ OUT_PERBP_CVG ]
 else:
@@ -170,7 +170,8 @@ rule trim_arms:
         bam_trimmed_sort=OUT_DIR+'/temp/miparm_trimmed/{libname}.trimsort.bam'
     threads: 1
     params:
-        probe_table=config['probe_table']
+        probe_table=config['probe_table'],
+        ref=config['reference_files']['bwa_ref']
     shell:
         """
         exact_trim_mip_arms \
@@ -178,11 +179,9 @@ rule trim_arms:
             --outBam {output.bam_trimmed} \
             --inMipTable {params.probe_table} >/dev/null;
 
-        java -d64 -Xmx8G -jar ${{PICARD_DIR}}/picard.jar \
-            FixMateInformation \
-            AS=true SO=coordinate CREATE_INDEX=true \
-            VALIDATION_STRINGENCY=LENIENT \
-            I={output.bam_trimmed} O={output.bam_trimmed_sort}
+        samtools fixmate --reference {params.ref} -O BAM {output.bam_trimmed} - | samtools sort -m4G -@0 -O BAM -o - | samtools calmd --reference {params.ref} -b - > {output.bam_trimmed_sort};
+
+        samtools index {output.bam_trimmed_sort};
         """
 
 rule dup_removal:
