@@ -75,22 +75,30 @@ else:
         os.makedirs(OUT_DIR)
     except:
         pass
-        
-    tblProbes = pd.read_csv(config['probe_table'],sep='\t')
-    tblGapFills = pd.DataFrame({
-        'chrom': tblProbes.chrom.astype('str'),
-        'start': tblProbes.ext_probe_end.astype('int')+1,
-        'end': tblProbes.lig_probe_start.astype('int'),
-        'name': tblProbes.mip_index.astype('str') })
-    tblGapFills = tblGapFills.sort_values(by=['chrom','start'])
-    tblGapFills = tblGapFills[ ['chrom','start','end','name'] ]
-    btGapFills = pbt.BedTool.from_dataframe( tblGapFills )
 
     CVG_BED = OUT_DIR + '/' + config['prefix'] + '.coverage_check.bed'
 
-    print('making target bed file in ',CVG_BED)
 
-    btJoinedGapFills = btGapFills.merge( ).saveas(CVG_BED)
+lOut += [CVG_BED]
+
+
+rule make_cvg_target_bed:
+    output: CVG_BED
+    run:        
+        if 'coverage_target_bed' not in config['reference_files']:
+            tblProbes = pd.read_csv(config['probe_table'],sep='\t')
+            tblGapFills = pd.DataFrame({
+                'chrom': tblProbes.chrom.astype('str'),
+                'start': tblProbes.ext_probe_end.astype('int')+1,
+                'end': tblProbes.lig_probe_start.astype('int'),
+                'name': tblProbes.mip_index.astype('str') })
+            tblGapFills = tblGapFills.sort_values(by=['chrom','start'])
+            tblGapFills = tblGapFills[ ['chrom','start','end','name'] ]
+            btGapFills = pbt.BedTool.from_dataframe( tblGapFills )
+
+            print('making target bed file in ',output)
+
+            btJoinedGapFills = btGapFills.merge( ).saveas(output)
 
 ########
 
@@ -205,7 +213,8 @@ rule dup_removal:
 
 rule coverage_uniformity:
     input:
-        bam_input=rules.dup_removal.output.bam_dedupd
+        bam_input=rules.dup_removal.output.bam_dedupd,
+        cvg_bed=CVG_BED
     output:
         histogram=OUT_DIR+'/mippipe/summaries/cvg/{libname}.dedupd.histo.txt',
         per_tgt=OUT_DIR+'/mippipe/summaries/cvg/{libname}.dedupd.per_tgt.txt'
@@ -221,7 +230,7 @@ rule coverage_uniformity:
                   --extendReadsBy {params.extend_by} \
                   --genomeChromSizes {params.chrom_sizes} \
                   --libname {wildcards.libname} \
-                  --inBedTargets {CVG_BED} \
+                  --inBedTargets {input.cvg_bed} \
                   --outUnifTbl {output.histogram} \
                   --outPerTgtTbl {output.per_tgt}
                 """
@@ -235,7 +244,7 @@ rule coverage_uniformity:
                   --extendReadsBy {params.extend_by} \
                   --genomeChromSizes {params.chrom_sizes} \
                   --libname {wildcards.libname} \
-                  --inBedTargets {CVG_BED} \
+                  --inBedTargets {input.cvg_bed} \
                   --outUnifTbl {output.histogram} \
                   --outPerTgtTbl {output.per_tgt} \
                   --outPerBaseTbl {outPerBase} 
