@@ -138,7 +138,7 @@ if __name__ == '__main__':
         if in_qcsummary.shape[0] < _in_qcsummary.shape[0]:
             print( 'WARNING: %d libraries in QC summary are not found in the plate key file: %s'%( 
                 _in_qcsummary.shape[0] - in_qcsummary.shape[0],
-                '\n'.join( list(set(_in_qcsummary['libname']).difference( set(in_qcsummary['libnmae']))) )
+                '\n'.join( list(set(_in_qcsummary['libname']).difference( set(in_qcsummary['libname']))) )
             ) )
 
     ################################################
