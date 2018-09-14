@@ -33,7 +33,8 @@ setup(
     		 	 	         'probe_hit_count_from_bam = mimips.uniformity.probe_hit_count_from_bam:main',
     		 	 	         'target_coverage_uniformity = mimips.uniformity.target_coverage_uniformity:main',
                              'forcore_mip_sample_sheet = mimips.forcore_mip_sample_sheet:main',
-                             'join_mip_libsheet_core_iemsheet = mimips.join_mip_libsheet_core_iemsheet:main'
+                             'join_mip_libsheet_core_iemsheet = mimips.join_mip_libsheet_core_iemsheet:main',
+                             'sex_chrom_check = mimips.uniformity.sex_chrom_checks:main'
     		 	 	          ]
     }
 )

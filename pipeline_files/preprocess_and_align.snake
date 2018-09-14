@@ -251,9 +251,6 @@ rule coverage_uniformity:
                 """
             )
 
-
-
-
 rule probe_level_uniformity:
     input:
         bam_input=rules.dup_removal.output.bam_dedupd
@@ -269,6 +266,20 @@ rule probe_level_uniformity:
               --inBam {input.bam_input} \
               --outMipPairTbl {output.per_probe} \
               1>/dev/null
+        """      
+
+rule sex_check:
+    input:
+        per_probe=rules.probe_level_uniformity.output.per_probe
+    output:
+        sex_check=OUT_DIR+'/mippipe/summaries/byprobe/{libname}.dedupd.sexcheck.txt'
+    threads: 1
+    shell:
+        """
+        sex_chrom_check \
+            --inPerProbeUnifTbl {input.per_probe} \
+            --libname {wildcards.libname} \
+            --outSexChromTbl {output.sex_check}
         """      
 
 
@@ -292,6 +303,7 @@ rule gather_qc:
         dup_summaries=expand(rules.dup_removal.output.summary, libname=lLibs),
         annot_summaries=expand(rules.annot_by_probe.output.summary, libname=lLibs),
         coverage_per_probe=expand(rules.probe_level_uniformity.output.per_probe, libname=lLibs),
+        sex_check=expand( rules.sex_check.output.sex_check, libname=lLibs )
     output:
         rpt_temp1=temp(OUT_QC_SUMMARY_RPT+'.temp1'),
         rpt_temp2=temp(OUT_QC_SUMMARY_RPT+'.temp2'),
@@ -314,12 +326,17 @@ rule gather_qc:
             --coloutPrefix dedupd
         """)
 
+        tblSexCheck=[ pd.read_table(fn) for fn in input.sex_check ]
+        tblSexCheck=pd.concat( tblSexCheck )
+
         tblDupSummaries=[ pd.read_csv(fn,sep='\t') for fn in input.dup_summaries ]
         tblDupSummaries=pd.concat( tblDupSummaries )
 
         tblCvgSummary=pd.read_csv( output.rpt_temp2, sep='\t' )
         tblCvgAndDup=pd.merge( tblCvgSummary, tblDupSummaries, on='libname', how='inner' )
         del tblCvgAndDup['histos']
+
+        tblCvgAndDup=pd.merge( tblCvgAndDup, tblSexCheck, on='libname', how='left'  )
 
         tblAddlFiles = { 'libname': lLibs,
                          'cvg_overall_histo': [fn for fn in input.histos],
@@ -360,6 +377,9 @@ rule gather_qc:
         tblOut['num_pairs_dedup_mapped'] = tblJoint['n_read1_checked_for_dup_mids'] - tblJoint['n_dup_mids_found']
 
         for c in ['dedupdcvg_gte_1','dedupdcvg_gte_4','dedupdcvg_gte_8','dedupdcvg_gte_20','dedupdcvg_gte_100']:
+            tblOut[c]=tblJoint[c]
+
+        for c in ['chrX_frac','chrY_frac']:
             tblOut[c]=tblJoint[c]
 
         tblOut['bam']=tblJoint['bam']

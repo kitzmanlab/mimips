@@ -24,7 +24,6 @@ def main():
     opts.add_argument('--inMipPairTbl', dest='inMipPairTbl')
     opts.add_argument('--inBam', dest='inBam')
     opts.add_argument('--outMipPairTbl', dest='outMipPairTbl')
-
     opts.add_argument('--prefixChar', default='Z', dest='prefixChar')
 
     o = opts.parse_args()
