@@ -98,7 +98,8 @@ rule make_cvg_target_bed:
 
             print('making target bed file in ',output)
 
-            btJoinedGapFills = btGapFills.merge( ).saveas(output)
+            btJoinedGapFills = btGapFills.merge( ).saveas(str(output))
+
 
 ########
 

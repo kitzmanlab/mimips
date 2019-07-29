@@ -7,6 +7,9 @@ import sys
 import argparse
 from collections import OrderedDict
 
+from matplotlib.colors import LogNorm
+
+
 import os.path
 
 import pandas as pd
@@ -238,6 +241,41 @@ if __name__ == '__main__':
             plt.tight_layout()
 
             f.savefig('%s_%s.by_well.num_readpair_perlib.pdf'%(o.out_base, plate))
+
+
+    ################################################
+    #
+    # pooling balance plot, plate-wise
+    #
+
+    if o.plot_by_plate:
+
+        mPlateTbl = makeByWellTbl( in_qcsummary, o.col_platewell, o.col_platename, 'num_pairs_input', dtype=float )
+
+        for plate in mPlateTbl:
+            mPlateTbl[plate]=1e8*mPlateTbl[plate]/float(mPlateTbl[plate].sum().sum())
+
+        for plate in mPlateTbl:
+
+            hwka={}
+
+            hwka={'annot':True, 'fmt':'.1e', 'vmin':1e5, 'vmax':1.5e6 , 
+             'norm':LogNorm(vmin=2e5,vmax=1.5e6), 
+             'cbar_kws':{
+                'ticks':[1e5,2.5e5,5e5,1e6,1.5e6],
+                'format':'%.2e'
+                },
+             'cmap':'viridis'}
+
+            f,ax = plotByWellTbl(  mPlateTbl[plate],
+                                   heatmap_kwargs=hwka,
+                                   annot_kwargs={'size':5.}  )
+
+            plt.title('Capture set %s, projected # reads pairs per 100 million'%plate)
+
+            plt.tight_layout()
+
+            f.savefig('%s_%s.by_well.readsperHmillion.pdf'%(o.out_base, plate))
 
 
     ################################################
