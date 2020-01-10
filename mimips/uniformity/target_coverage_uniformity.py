@@ -77,9 +77,12 @@ def computeCoverage( fnBed, fnBam, genomeChromSizes, libname, extendReadsBy=0 ):
     else:
         # btReadsIn = pbt.BedTool( fnBam ).bam_to_bed( ).cut( [0,1,2] )
         # need to capture strand info
-        btReadsIn = pbt.BedTool( fnBam ).bam_to_bed( ).cut( [0,1,2,3,4,5] )
+
+        # bam_to_bed chokes on empty bam files... so count first...
+        btReadsIn = pbt.BedTool( fnBam )
 
         if len(btReadsIn)>0:
+            btReadsIn = pbt.BedTool( fnBam ).bam_to_bed( ).cut( [0,1,2,3,4,5] )        
             btReads = btReadsIn.slop( g=genomeChromSizes, l=0, r=extendReadsBy, s=True )
         else:
             btReads = btReadsIn

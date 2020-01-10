@@ -13,7 +13,7 @@ import pybedtools as pbt
 
 ########
 
-ENV2 = "source activate {config[py2_environment]}".format(config=config)
+ENV2 = "source $HOME/.bashrc; source activate {config[py2_environment]}".format(config=config)
 shell.prefix('{ENV2} ; ')
 
 ########

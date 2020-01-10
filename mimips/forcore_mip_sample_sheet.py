@@ -205,39 +205,46 @@ def main():
 
         wb = ct.active
 
-        wb['A13']='Sample Name*'
+        # wb['A13']='Sample Name*'
 
         rowofs=0
         for _,r in df.iterrows():
-            shloco=ofsFrom('A14',down=rowofs,right=0)
+            shloco=ofsFrom('A18',down=rowofs,right=0)
             wb[ shloco ] = r.libname
 
-            shloco=ofsFrom('A14',down=rowofs,right=1)
-            wb[ shloco ] = o.coreBuffer
+            # shloco=ofsFrom('A18',down=rowofs,right=1)
+            # wb[ shloco ] = o.coreBuffer
 
-            shloco=ofsFrom('A14',down=rowofs,right=2)
+            shloco=ofsFrom('A18',down=rowofs,right=2)
             wb[ shloco ] = float(o.coreConc)
 
-            shloco=ofsFrom('A14',down=rowofs,right=3)
+            shloco=ofsFrom('A18',down=rowofs,right=3)
             wb[ shloco ] = float(o.coreVol)
 
-            shloco=ofsFrom('A14',down=rowofs,right=4)
-            wb[ shloco ] = float(o.coreFraglen)
+            # shloco=ofsFrom('A18',down=rowofs,right=4)
+            # wb[ shloco ] = float(o.coreFraglen)
 
-            shloco=ofsFrom('A14',down=rowofs,right=5)
+            shloco=ofsFrom('A18',down=rowofs,right=5)
             bcseq5 = mBcNameSeq_i5i7[ r.p5_barc ][0]
             bcseq7 = mBcNameSeq_i5i7[ r.p7_barc ][1]
-            wb[ shloco ] = '%s-%s'%(bcseq7,bcseq5)
+            wb[ shloco ]=bcseq7
 
-            shloco=ofsFrom('A14',down=rowofs,right=6)
-            wb[ shloco ] = o.coreShortcode
+            shloco=ofsFrom('A18',down=rowofs,right=4)
+            wb[ shloco ]=bcseq5
 
-            shloco=ofsFrom('A14',down=rowofs,right=7)
+            # shloco=ofsFrom('A18',down=rowofs,right=6)
+            # wb[ shloco ] = o.coreShortcode
+
+            shloco=ofsFrom('A18',down=rowofs,right=5)
             wb[ shloco ] = o.coreSpecies
 
+            shloco=ofsFrom('A18',down=rowofs,right=6)
+            wb[ shloco ] = "DNA"
+            
             if rowofs==0:
-                shloco=ofsFrom('A14',down=rowofs,right=8)
+                shloco=ofsFrom('A18',down=rowofs,right=7)
                 wb[ shloco ] = o.coreNotes
+
 
             rowofs+=1
 

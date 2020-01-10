@@ -306,7 +306,7 @@ def main():
 
     bamIn = pysam.Samfile( o.inBam, 'rb' )
 
-    hdrOut = bamIn.header
+    hdrOut = dict(bamIn.header)
     hdrOut['RG']=mRG
     
     bamOut = pysam.Samfile( o.outBam, 'wb', header=hdrOut )
