@@ -3,7 +3,7 @@
 # snakemake -s PATH_TO/preprocess_and_align.snake --configfile PATH_TO/config.yaml --config sample_table=key_test.txt work_dir=`pwd` prefix=mymipset  --printshellcmds  --cores 16
 
 # must specify configuration values:
-#   sample_table - must be a file w/ columns: libname, flowcell, lane, fq_fwd, fq_rev
+#   sample_table - must be a file w/ columns: libname, fq_fwd, fq_rev
 #   prefix - a name for this set of mip captures.
 
 import os.path as op
@@ -13,7 +13,8 @@ import pybedtools as pbt
 
 ########
 
-ENV2 = "source $HOME/.bashrc; source activate {config[py2_environment]}".format(config=config)
+#ENV2 = "source $HOME/.bashrc; conda activate {config[py2_environment]}".format(config=config)
+ENV2 = "conda activate {config[py2_environment]}".format(config=config)
 shell.prefix('{ENV2} ; ')
 
 ########
@@ -25,11 +26,11 @@ OUT_DIR = config['work_dir']
 
 tblSamples = pd.read_csv( config['sample_table'], sep='\t' )
 
-assert all( [ col in tblSamples.columns for col in ('libname','flowcell','lane','fq_fwd','fq_rev') ] ), 'sample table must have columns: libname, flowcell, lane, fq_fwd, fq_rev'
+assert all( [ col in tblSamples.columns for col in ('libname','fq_fwd','fq_rev') ] ), 'sample table must have columns: libname, fq_fwd, fq_rev'
 
-assert tblSamples[['libname','flowcell','lane']].drop_duplicates().shape[0]==tblSamples.shape[0], 'each combination of libname,flowcell,lane must be unique'
+assert tblSamples[['libname']].drop_duplicates().shape[0]==tblSamples.shape[0], 'each library name must be unique'
 
-tblSamples = tblSamples.set_index( ['libname','flowcell','lane'], drop=False )
+tblSamples = tblSamples.set_index( ['libname'], drop=False )
 
 lLibs = tblSamples.libname.unique()
 
@@ -54,11 +55,9 @@ OUT_ADDL_FILES = '{OUT_DIR}/mippipe/summaries/{prefix}.addlfiles.txt'.format(OUT
 
 # if we're doing per bp coverage, the summary track
 if config['generate_per_base_cvg']:
-    print('generating per bp cvg')
     OUT_PERBP_CVG = '{OUT_DIR}/mippipe/summaries/{prefix}.perbp_cvg.txt'.format(OUT_DIR=OUT_DIR, prefix=config['prefix'])
     lOut += [ OUT_PERBP_CVG ]
 else:
-    print('skipping per bp cvg')
     OUT_PERBP_CVG = []
 
 rule all:
@@ -75,11 +74,21 @@ else:
         os.makedirs(OUT_DIR)
     except:
         pass
+    tblProbes = pd.read_csv(config['probe_table'],sep='\t')
+    tblGapFills = pd.DataFrame({
+        'chrom': tblProbes.chrom.astype('str'),
+        'start': tblProbes.ext_probe_end.astype('int')+1,
+        'end': tblProbes.lig_probe_start.astype('int'),
+        'name': tblProbes.mip_index.astype('str') })
+    tblGapFills = tblGapFills.sort_values(by=['chrom','start'])
+    tblGapFills = tblGapFills[ ['chrom','start','end','name'] ]
+    btGapFills = pbt.BedTool.from_dataframe( tblGapFills )
 
     CVG_BED = OUT_DIR + '/' + config['prefix'] + '.coverage_check.bed'
 
+    print('making target bed file in ',CVG_BED)
 
-lOut += [CVG_BED]
+    btJoinedGapFills = btGapFills.merge( ).saveas(CVG_BED)
 
 
 rule make_cvg_target_bed:
@@ -106,8 +115,8 @@ rule make_cvg_target_bed:
 # map and consolidate by library
 rule bwa_mem:  
     input:
-        fq_fwd=lambda wc:list(tblSamples.loc[ wc.libname ][ 'fq_fwd' ]),
-        fq_rev=lambda wc:list(tblSamples.loc[ wc.libname ][ 'fq_rev' ])
+        fq_fwd=lambda wc:list(tblSamples.loc[ wc ][ 'fq_fwd' ]),
+        fq_rev=lambda wc:list(tblSamples.loc[ wc ][ 'fq_rev' ])
     output:
         bam_unsorted=OUT_DIR+'/temp/bwa/us/{libname}.bam'
     params:
@@ -125,7 +134,7 @@ rule bwa_mem:
 
         shell(
         """
-        bwa mem -R '@RG\tID:{wildcards.libname}\tSM:{wildcards.libname}\tLB:{wildcards.libname}\tPL:ILLUMINA' \
+        bwa mem -R '@RG\\tID:{wildcards.libname}\\tSM:{wildcards.libname}\\tLB:{wildcards.libname}\\tPL:ILLUMINA' \
             -t {threads} \
             -M \
             {params.ref} \
@@ -141,7 +150,7 @@ rule bwa_mem:
 
 rule annot_by_probe:
     input:
-        fq_rev=lambda wc:list(tblSamples.loc[ wc.libname ][ 'fq_rev' ]),
+        fq_rev=lambda wc:list(tblSamples.loc[ wc ][ 'fq_rev' ]),
         bam_input=rules.bwa_mem.output.bam_unsorted
     output:
         bam_unsorted_mipannotated=OUT_DIR+'/temp/miparm_annot/{libname}.annotd.bam',
@@ -175,22 +184,23 @@ rule trim_arms:
     input:
         bam_input=rules.annot_by_probe.output.bam_unsorted_mipannotated
     output:
-        bam_trimmed=temp(OUT_DIR+'/temp/miparm_trimmed/{libname}.trimmed.bam'),
+        bam_trimmed=OUT_DIR+'/temp/miparm_trimmed/{libname}.trimmed.bam',
         bam_trimmed_sort=OUT_DIR+'/temp/miparm_trimmed/{libname}.trimsort.bam'
     threads: 1
     params:
-        probe_table=config['probe_table'],
-        ref=config['reference_files']['bwa_ref']
+        probe_table=config['probe_table']
     shell:
         """
         exact_trim_mip_arms \
             --inBam {input.bam_input} \
             --outBam {output.bam_trimmed} \
-            --inMipTable {params.probe_table} >/dev/null;
+            --inMipTable {params.probe_table} ;
 
-        samtools fixmate --reference {params.ref} -O BAM {output.bam_trimmed} - | samtools sort -m4G -@0 -O BAM -o - | samtools calmd --reference {params.ref} -b - > {output.bam_trimmed_sort};
-
-        samtools index {output.bam_trimmed_sort};
+        java -d64 -Xmx8G -jar ${{PICARD_DIR}}/picard.jar \
+            FixMateInformation \
+            AS=true SO=coordinate CREATE_INDEX=true \
+            VALIDATION_STRINGENCY=LENIENT \
+            I={output.bam_trimmed} O={output.bam_trimmed_sort}
         """
 
 rule dup_removal:
@@ -214,8 +224,7 @@ rule dup_removal:
 
 rule coverage_uniformity:
     input:
-        bam_input=rules.dup_removal.output.bam_dedupd,
-        cvg_bed=CVG_BED
+        bam_input=rules.dup_removal.output.bam_dedupd
     output:
         histogram=OUT_DIR+'/mippipe/summaries/cvg/{libname}.dedupd.histo.txt',
         per_tgt=OUT_DIR+'/mippipe/summaries/cvg/{libname}.dedupd.per_tgt.txt'
@@ -231,7 +240,7 @@ rule coverage_uniformity:
                   --extendReadsBy {params.extend_by} \
                   --genomeChromSizes {params.chrom_sizes} \
                   --libname {wildcards.libname} \
-                  --inBedTargets {input.cvg_bed} \
+                  --inBedTargets {CVG_BED} \
                   --outUnifTbl {output.histogram} \
                   --outPerTgtTbl {output.per_tgt}
                 """
@@ -245,7 +254,7 @@ rule coverage_uniformity:
                   --extendReadsBy {params.extend_by} \
                   --genomeChromSizes {params.chrom_sizes} \
                   --libname {wildcards.libname} \
-                  --inBedTargets {input.cvg_bed} \
+                  --inBedTargets {CVG_BED} \
                   --outUnifTbl {output.histogram} \
                   --outPerTgtTbl {output.per_tgt} \
                   --outPerBaseTbl {outPerBase} 
@@ -293,7 +302,7 @@ rule gather_perbp:
         """ 
         gather_perbp_uniformity \
             --inKey {input.tbl_addl_files} \
-            --cvgThresholds 1,2,4,6,8,10,20,50,100 \
+            --cvgThresholds 1,2,4,6,8,10,20,50,100,500,1000 \
             --outTbl {output.out_perbp}
         """
 
@@ -323,7 +332,7 @@ rule gather_qc:
             --inKey {output.rpt_temp1} \
             --outKey {output.rpt_temp2} \
             --colHisto histos \
-            --cvgThresholds 1,2,4,8,20,100 \
+            --cvgThresholds 1,2,4,8,10,20,100,500,1000 \
             --coloutPrefix dedupd
         """)
 
@@ -377,7 +386,7 @@ rule gather_qc:
 
         tblOut['num_pairs_dedup_mapped'] = tblJoint['n_read1_checked_for_dup_mids'] - tblJoint['n_dup_mids_found']
 
-        for c in ['dedupdcvg_gte_1','dedupdcvg_gte_4','dedupdcvg_gte_8','dedupdcvg_gte_20','dedupdcvg_gte_100']:
+        for c in ['dedupdcvg_gte_1','dedupdcvg_gte_2','dedupdcvg_gte_4','dedupdcvg_gte_8','dedupdcvg_gte_20','dedupdcvg_gte_100','dedupdcvg_gte_500','dedupdcvg_gte_1000']:
             tblOut[c]=tblJoint[c]
 
         for c in ['chrX_frac','chrY_frac']:
