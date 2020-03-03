@@ -14,7 +14,8 @@ import pybedtools as pbt
 ########
 
 #ENV2 = "source $HOME/.bashrc; conda activate {config[py2_environment]}".format(config=config)
-ENV2 = "conda activate {config[py2_environment]}".format(config=config)
+#ENV2 = "conda activate {config[py2_environment]}".format(config=config)
+ENV2 = "source activate {config[py2_environment]}".format(config=config)
 shell.prefix('{ENV2} ; ')
 
 ########
@@ -386,7 +387,7 @@ rule gather_qc:
 
         tblOut['num_pairs_dedup_mapped'] = tblJoint['n_read1_checked_for_dup_mids'] - tblJoint['n_dup_mids_found']
 
-        for c in ['dedupdcvg_gte_1','dedupdcvg_gte_2','dedupdcvg_gte_4','dedupdcvg_gte_8','dedupdcvg_gte_20','dedupdcvg_gte_100','dedupdcvg_gte_500','dedupdcvg_gte_1000']:
+        for c in ['dedupdcvg_gte_1','dedupdcvg_gte_2','dedupdcvg_gte_4','dedupdcvg_gte_8','dedupdcvg_gte_20','dedupdcvg_gte_100','dedupdcvg_gte_500','dedupdcvg_gte_1000','dedupdcvg_qile_10','dedupdcvg_qile_25','dedupdcvg_qile_50','dedupdcvg_qile_75','dedupdcvg_qile_90']:
             tblOut[c]=tblJoint[c]
 
         for c in ['chrX_frac','chrY_frac']:
