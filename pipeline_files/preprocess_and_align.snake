@@ -204,28 +204,79 @@ rule trim_arms:
             I={output.bam_trimmed} O={output.bam_trimmed_sort}
         """
 
-rule dup_removal:
+rule group_by_umi:
     input: 
-        bam_input=rules.trim_arms.output.bam_trimmed_sort
-    output: 
-        bam_dedupd=OUT_DIR+'/mippipe/dedup/{libname}.bam',
-        summary=OUT_DIR+'/mippipe/summaries/dedup/{libname}.duprate.txt'
+        bam_input=rules.trim_arms.output.bam_trimmed_sort  
+    output:
+        bam_groupbyumi=OUT_DIR+'/temp/groupbyumi/{libname}.bam',
+        gumi_size_histos=OUT_DIR+'/temp/groupbyumi/{libname}.tagfamsizes.txt'
     threads: 1
     shell:
         """
-        flag_dup_mid_reads \
-          --libname {wildcards.libname}\
-          --inBam {input.bam_input} \
-          --outBam {output.bam_dedupd} \
-          --suppressDupMIDs \
-          --outSummary {output.summary};  
+        java -Xmx8g -jar ${{fgbio}} GroupReadsByUmi -i {input.bam_input} -o {output.bam_groupbyumi} --family-size-histogram={output.gumi_size_histos} -t YT -T YT -s edit --edits=1 --min-map-q=5 
+        """
 
-        samtools index {output.bam_dedupd}
+rule call_consensus:
+    input:
+        bam_input=rules.group_by_umi.output.bam_groupbyumi
+    output:
+        bam_cns=OUT_DIR+'/temp/consensus/{libname}.cns.bam',
+        bam_cns_rejects=OUT_DIR+'/temp/consensus/{libname}.cns_rejects.bam',
+    threads: 1
+    shell:
+        """
+        java -Xmx8g -jar ${{fgbio}} CallMolecularConsensusReads \
+            --min-reads=1 --error-rate-post-umi=30 \
+            --min-input-base-quality=20 \
+            -i {input.bam_input} -o {output.bam_cns} \
+            --rejects={output.bam_cns_rejects} \
+            -t YT -S Queryname
+        """
+
+rule filter_consensus:
+    input:
+        bam_input=rules.call_consensus.output.bam_cns
+    output:
+        bam_cns_filt=OUT_DIR+'/temp/consensus_filt/{libname}.filt.bam'
+    params:
+        ref=config['reference_files']['bwa_ref']
+    threads: 1
+    shell:
+        """
+        java -Xmx8g -jar ${{fgbio}} FilterConsensusReads \
+            --input={input.bam_input} \
+            --output={output.bam_cns_filt} \
+            --ref={params.ref} \
+            --min-reads=1 \
+            --max-read-error-rate=0.1 \
+            --min-base-quality=20 \
+            --max-base-error-rate=0.1 \
+            --max-no-call-fraction=0.1
+        """
+
+rule remap_consensus:    
+    input:
+        bam_input=rules.filter_consensus.output.bam_cns_filt,
+        bam_pre_cns=rules.trim_arms.output.bam_trimmed_sort
+    output:
+        bam_dedupd=OUT_DIR+'/mippipe/dedup/{libname}.bam',
+        summary=OUT_DIR+'/mippipe/summaries/dedup/{libname}.duprate.txt'
+    params:
+        ref=config['reference_files']['bwa_ref']
+    threads: 4
+    shell:
+        """java -Xmx4g -jar ${{PICARD_DIR}}/picard.jar SamToFastq I={input.bam_input} \
+            F=/dev/stdout INTERLEAVE=true |\
+        bwa mem -p -t {threads} {params.ref} /dev/stdin |\
+            samtools view -bS -  | samtools sort -@{threads} -m4G - > {output.bam_dedupd}
+        samtools index {output.bam_dedupd};
+
+        est_libsize_already_dedupd --libname {wildcards.libname} --inPreConsensusBam {input.bam_pre_cns} --inPostConsensusBam {output.bam_dedupd} --outSummary {output.summary};
         """
 
 rule coverage_uniformity:
     input:
-        bam_input=rules.dup_removal.output.bam_dedupd
+        bam_input=rules.remap_consensus.output.bam_dedupd
     output:
         histogram=OUT_DIR+'/mippipe/summaries/cvg/{libname}.dedupd.histo.txt',
         per_tgt=OUT_DIR+'/mippipe/summaries/cvg/{libname}.dedupd.per_tgt.txt'
@@ -264,7 +315,7 @@ rule coverage_uniformity:
 
 rule probe_level_uniformity:
     input:
-        bam_input=rules.dup_removal.output.bam_dedupd
+        bam_input=rules.remap_consensus.output.bam_dedupd
     output:
         per_probe=OUT_DIR+'/mippipe/summaries/byprobe/{libname}.dedupd.byprobe.txt'
     threads: 1
@@ -309,9 +360,9 @@ rule gather_perbp:
 
 rule gather_qc:
     input:
-        bam_input=expand(rules.dup_removal.output.bam_dedupd,libname=lLibs),
+        bam_input=expand(rules.remap_consensus.output.bam_dedupd,libname=lLibs),
         histos=expand(rules.coverage_uniformity.output.histogram,libname=lLibs),
-        dup_summaries=expand(rules.dup_removal.output.summary, libname=lLibs),
+        dup_summaries=expand(rules.remap_consensus.output.summary, libname=lLibs),
         annot_summaries=expand(rules.annot_by_probe.output.summary, libname=lLibs),
         coverage_per_probe=expand(rules.probe_level_uniformity.output.per_probe, libname=lLibs),
         sex_check=expand( rules.sex_check.output.sex_check, libname=lLibs )

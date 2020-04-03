@@ -24,6 +24,7 @@ setup(
     entry_points = {
     	'console_scripts': [ 'rev_read_strip_mid = mimips.rev_read_strip_mid:main',
     		 	 	         'merged_pe_strip_mid = mimips.merged_pe_strip_mid:main',
+                            'est_libsize_already_dedupd = mimips.est_libsize_already_dedupd:main',
     		 	 	         'flag_dup_mid_reads = mimips.flag_dup_mid_reads:main',
     		 	 	         'exact_trim_mip_arms = mimips.exact_trim_mip_arms_v2:main',
     		 	 	         'annotate_bam_by_mip_SE = mimips.annotate_bam_by_mip_SE:main',
