@@ -9,6 +9,7 @@
 import os.path as op
 import os
 import pandas as pd
+import re
 
 
 ########
@@ -40,7 +41,7 @@ lOut += expand('{}/temp/fqfix/{{libname}}.2.fq.gz'.format(OUT_DIR),
               libname=lLibs)
 
 # sample_key
-OUT_STRIP_RPT = './{prefix}.adaptstrip.txt'.format(OUT_DIR=OUT_DIR, prefix=config['prefix'])
+OUT_STRIP_RPT = '{prefix}.adaptstrip.txt'.format(OUT_DIR=OUT_DIR, prefix=config['prefix'])
 lOut += [ OUT_STRIP_RPT ]
 
 rule all:
@@ -90,5 +91,32 @@ rule output_key:
         tbl_out['fq_rev_input'] = tbl_out['fq_rev']
         tbl_out['fq_fwd'] = list(input.fq1_input)
         tbl_out['fq_rev'] = list(input.fq2_input)
+
+        tbl_out['n_pairs_pre_adaptscreen']=0
+        tbl_out['n_pairs_pass_adaptscreen']=0
+        tbl_out['frac_pairs_pass_adaptscreen']=0
+
+        for ln in lLibs:
+            fn_log = OUT_DIR+'/temp/fqfix/{}.cutadapt.log'.format(ln)
+            ll_log = [ l.strip() for l in open(fn_log,'r') ]
+            ll_tm = [ re.search( r'Total read pairs processed:\s+([0-9,]+)', l ) for l in ll_log ]
+            ll_tm = [ m for m in ll_tm if m]
+            assert(len(ll_tm)==1,ln)
+
+            nin = int( ll_tm[0].group(1).replace(',','') )
+            tbl_out.loc[ln,'n_pairs_pre_adaptscreen'] = nin
+
+            ll_wi = [ re.search( r'Pairs written \(passing filters\):\s+([0-9,]+)\s+\(([0-9.]+)%\)', l ) for l in ll_log ]
+            ll_wi = [ m for m in ll_wi if m ]
+            assert(len(ll_wi)==1,ln)
+
+            nout = int( ll_wi[0].group(1).replace(',','') )
+            tbl_out.loc[ln,'n_pairs_pass_adaptscreen'] = nout
+
+            if nout>0:
+                tbl_out.loc[ln,'frac_pairs_pass_adaptscreen'] = nout / nin
+            else:
+                tbl_out.loc[ln,'frac_pairs_pass_adaptscreen'] = 0
+
 
         tbl_out.to_csv( output.out_rpt, sep='\t', index=False )

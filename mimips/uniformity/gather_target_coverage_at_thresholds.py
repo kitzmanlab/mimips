@@ -48,6 +48,9 @@ def main():
 
         tblCvg = pd.read_csv( r[o.colHisto], sep='\t' )
 
+        tblCvg['depth'] = tblCvg['depth'].fillna(0)
+
+
         for thresh in lThresholds:
             fracOverThresh = tblCvg.ix[ tblCvg['depth']>=thresh, 'percent' ].sum()
 

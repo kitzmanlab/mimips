@@ -193,7 +193,7 @@ def main():
 
     df['libname']=''
     for i in df.index:
-        df.ix[i,'libname'] = fxnLibName( df.ix[i] )
+        df.loc[i,'libname'] = fxnLibName( df.loc[i] )
 
     # save to our own key
     df.to_csv(o.libKeyOut, sep='\t', index=False)        

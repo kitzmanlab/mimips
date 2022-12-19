@@ -2,7 +2,6 @@ from __future__ import division
 from __future__ import print_function
 #from builtins import str  # this breaks all sorts of other scripts which test type(x)==str
 from builtins import range
-from past.utils import old_div
 import sys
 import argparse
 from collections import OrderedDict
@@ -67,7 +66,7 @@ def makeWellTblSingleCapset( sqctbl,
         if dtype is not None:
             cur_v = dtype(cur_v)
             
-        tblout.ix[cur_r,cur_c]=cur_v
+        tblout.loc[cur_r,cur_c]=cur_v
 
     
     return tblout
@@ -136,7 +135,7 @@ if __name__ == '__main__':
 
         _in_qcsummary = in_qcsummary.copy()
 
-        in_qcsummary = pd.merge( _in_qcsummary, platekey, how='inner', on='libname'  )
+        in_qcsummary = pd.merge( _in_qcsummary, platekey, how='inner', on='libname', suffixes=['_qc',''] )
 
         if in_qcsummary.shape[0] < _in_qcsummary.shape[0]:
             print( 'WARNING: %d libraries in QC summary are not found in the plate key file: %s'%( 

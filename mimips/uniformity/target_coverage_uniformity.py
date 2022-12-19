@@ -4,7 +4,6 @@ import argparse
 from collections import defaultdict,OrderedDict
 
 import os.path
-
 import pysam
 
 import pandas as pd
@@ -67,7 +66,7 @@ from ..mip_pipe_common import *
 
 #     return b, df
 
-def computeCoverage( fnBed, fnBam, genomeChromSizes, libname, extendReadsBy=0 ):
+def computeCoverage( fnBed, fnBam, genomeChromSizes, libname, extendReadsBy=0, groupTargsByName=False ):
 
     btTargets = pbt.BedTool( fnBed )
 
@@ -89,28 +88,42 @@ def computeCoverage( fnBed, fnBam, genomeChromSizes, libname, extendReadsBy=0 ):
 
 
     colsOutOverallHisto = ['depth','count','size','percent','libname','cumulative_percent']
-    colsOutPerTgtHisto = ['target_chrom','target_start','target_end','depth','nbp_at_depth','target_total_bp','target_frac_bp']
+    colsOutPerTgtSummary = ['tgtchrom','tgtstart','tgtend','mean_cvg','median_cvg','std_cvg','mad_cvg']
     colsOutPerBase = ['tgtchrom','tgtstart','tgtend','pos','cvg']
 
     tblOverallHisto = pd.DataFrame(
         OrderedDict( [ (c,[]) for c in colsOutOverallHisto ] ))
 
-    tblPerTargetHisto = pd.DataFrame(
-        OrderedDict( [ (c,[]) for c in colsOutPerTgtHisto] ))
+    # if len(btReadsIn) == 0:
 
-    if len(btReadsIn) == 0:
+    #     tblPerBase = pd.DataFrame(
+    #     OrderedDict( [ (c,[]) for c in colsOutPerBase] ))
 
-        tblPerBase = pd.DataFrame(
-        OrderedDict( [ (c,[]) for c in colsOutPerBase] ))
+    #     tblPerTargetSummary = OrderedDict( [ (c,[]) for c in colsOutPerTgtSummary] )
 
-        return tblOverallHisto, tblPerTargetHisto, tblPerBase
+    #     for iv in btTargets:
+    #         tblPerTargetSummary['tgtchrom'].append(iv.chrom)
+    #         tblPerTargetSummary['tgtstart'].append(iv.start)
+    #         tblPerTargetSummary['tgtend'].append(iv.end)
+    #         tblPerTargetSummary['mean_cvg'].append(0)
+    #         tblPerTargetSummary['median_cvg'].append(0)
+    #         tblPerTargetSummary['std_cvg'].append(0)
+    #         tblPerTargetSummary['mad_cvg'].append(0)
+
+    #     tblPerTargetSummary = pd.DataFrame(tblPerTargetSummary)
+
+    #     return tblOverallHisto, tblPerTargetSummary, tblPerBase
 
     tblPerBase = btTargets.coverage( btReads, d=True ).to_dataframe()
-    tblPerBase = tblPerBase[ tblPerBase.columns[:5] ]
+    # tblPerBase = tblPerBase[ tblPerBase.columns[:5] ]
 
     # import pdb ; pdb.set_trace()
 
-    tblPerBase.columns = [ 'tgtchrom','tgtstart','tgtend','pos','cvg' ]
+    if 'name' not in btTargets.to_dataframe().columns:
+        tblPerBase.columns = [ 'tgtchrom','tgtstart','tgtend','pos','cvg' ]
+    else:
+        tblPerBase.columns = [ 'tgtchrom','tgtstart','tgtend','tgtname','pos','cvg' ]
+
     tblPerBase['tgtchrom']=tblPerBase['tgtchrom'].astype('str')
     for col in ('tgtstart','tgtend','pos','cvg'):
         tblPerBase[col]=tblPerBase[col].astype('int32')
@@ -130,7 +143,16 @@ def computeCoverage( fnBed, fnBam, genomeChromSizes, libname, extendReadsBy=0 ):
     tblOverallHisto['libname'] = libname
     tblOverallHisto['cumulative_percent'] = 100 - np.r_[ 0., tblOverallHisto['percent'][:-1].cumsum() ]
 
-    return tblOverallHisto, tblPerTargetHisto, tblPerBase
+    # aggregate by target
+    if not groupTargsByName:
+        bytgt_summary = tblPerBase.groupby( ['tgtchrom','tgtstart','tgtend'] )['cvg'].agg( [np.mean, np.median, np.std, lambda x:np.median(np.abs(x-np.median(x)))] )
+    else:
+        bytgt_summary = tblPerBase.groupby( ['tgtname'] )['cvg'].agg( [np.mean, np.median, np.std, lambda x:np.median(np.abs(x-np.median(x)))] )
+
+    bytgt_summary.columns = ['mean_cvg','median_cvg','std_cvg','mad_cvg']
+    bytgt_summary = bytgt_summary.reset_index()
+
+    return tblOverallHisto, bytgt_summary, tblPerBase
 
 
     # for cvgThresh in lThresholds:
@@ -203,6 +225,8 @@ def main():
     opts.add_argument('--libname',default=None,dest='libname')
     opts.add_argument('--inBedTargets',default=None,dest='inBedTargets')
 
+    opts.add_argument('--groupTargsByName',default=False,action='store_true',dest='groupTargsByName')
+
     opts.add_argument('--outUnifTbl', dest='outUnifTbl')
     opts.add_argument('--outPerTgtTbl', dest='outPerTgtTbl')
     opts.add_argument('--outPerBaseTbl', dest='outPerBaseTbl')
@@ -216,7 +240,8 @@ def main():
                          o.inBam,
                          o.genomeChromSizes,
                          o.libname,
-                         o.extendReadsBy  )    
+                         o.extendReadsBy,
+                         o.groupTargsByName  )    
     
     tblPerTargetSummary.to_csv(o.outPerTgtTbl,index=False,sep='\t')
     
